@@ -18,7 +18,7 @@ def apply_mask(img: Image.Image, name: str) -> Image.Image:
         return img
 
     mask = Image.open(mask_file)
-    return Image.alpha_composite(img, mask)
+    return Image.alpha_composite(img.convert("RGBA"), mask).convert("RGB")
 
 def process_color(img: Image.Image, func: Callable[[_COLOR], _COLOR]):
     data = np.array(img)
@@ -129,6 +129,6 @@ def file_process_color(in_file: str | Path, output: str | Path, func: Callable[[
 
     img = process_color(img, func)
     if do_masking:
-        apply_mask(img, Path(in_file).name)
+        img = apply_mask(img, Path(in_file).name)
 
     save_optimized_file(img, output, compress)
