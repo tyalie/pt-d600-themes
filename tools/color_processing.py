@@ -1,4 +1,4 @@
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Optional
 from pathlib import Path
 from PIL import Image
 import numpy as np
@@ -12,13 +12,16 @@ MASK_FOLDER = Path(__file__).resolve().parent / "../_masks"
 
 _COLOR = Tuple[int,int,int]
 
-def apply_mask(img: Image.Image, name: str) -> Image.Image:
+def apply_mask(img: Image.Image, mask: Image.Image) -> Image.Image:
+    return Image.alpha_composite(img.convert("RGBA"), mask).convert("RGB")
+
+def apply_mask_from_dir(img: Image.Image, name: str) -> Image.Image:
     mask_file = MASK_FOLDER / name
     if not mask_file.is_file():
         return img
 
     mask = Image.open(mask_file)
-    return Image.alpha_composite(img.convert("RGBA"), mask).convert("RGB")
+    return apply_mask(img, mask)
 
 def process_color(img: Image.Image, func: Callable[[_COLOR], _COLOR]):
     data = np.array(img)
@@ -124,11 +127,15 @@ def save_optimized_file(img: Image.Image, output: str | Path, compress: bool = T
     with open(output, "wb") as fp:
         fp.write(data)
 
-def file_process_color(in_file: str | Path, output: str | Path, func: Callable[[_COLOR], _COLOR], compress: bool = True, do_masking: bool = True):
+def file_process_color(in_file: str | Path, output: str | Path, func: Callable[[_COLOR], _COLOR], compress: bool = True, do_masking: bool = True, custom_mask: Optional[Image.Image] = None):
     img = Image.open(in_file).convert("RGB")
 
     img = process_color(img, func)
+
+    if custom_mask is not None:
+        img = apply_mask(img, custom_mask)
+
     if do_masking:
-        img = apply_mask(img, Path(in_file).name)
+        img = apply_mask_from_dir(img, Path(in_file).name)
 
     save_optimized_file(img, output, compress)
