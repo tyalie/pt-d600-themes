@@ -9,6 +9,10 @@ def _color_int_to_float(color: _COLOR) -> Tuple[float,float,float]:
 def _color_float_to_int(color: Tuple[float,float,float]) -> _COLOR:
     return tuple(map(lambda v: int(v*0xff), color))
 
+def rgb_to_hsv(color: _COLOR) -> Tuple[float, float, float]:
+    h, s, v =  colorsys.rgb_to_hsv(*_color_int_to_float(color))
+    return h * 360, s * 100, v * 100
+
 def hue_rotate(color: _COLOR, angle_deg: float) -> _COLOR:
     v = list(colorsys.rgb_to_hsv(*_color_int_to_float(color)))
     v[0] = ((v[0] * 360 + angle_deg) / 360) % 1
