@@ -9,13 +9,25 @@ import io
 IGNORE_COLOR = (0xff, 0x00, 0xff)
 GIMP_CALL = ["flatpak", "run", "org.gimp.GIMP"]
 MASK_FOLDER = Path(__file__).resolve().parent / "../_masks"
+IMAGE_DPI = (37.8, 37.8)
 
 _COLOR = Tuple[int,int,int]
 
 def apply_mask(img: Image.Image, mask: Image.Image) -> Image.Image:
+    """
+    Apply a mask using alpha composite. In other words the mask is being
+    add to the originam image using the information from the alpha layer.
+
+    @return RGB image
+    """
     return Image.alpha_composite(img.convert("RGBA"), mask).convert("RGB")
 
 def apply_mask_from_dir(img: Image.Image, name: str) -> Image.Image:
+    """
+    Apply a mask from the common "_masks" directory in the root
+    of the project. Provided a file name has been given, the mask
+    gets choosen automatically.
+    """
     mask_file = MASK_FOLDER / name
     if not mask_file.is_file():
         return img
@@ -23,7 +35,15 @@ def apply_mask_from_dir(img: Image.Image, name: str) -> Image.Image:
     mask = Image.open(mask_file)
     return apply_mask(img, mask)
 
-def process_color(img: Image.Image, func: Callable[[_COLOR], _COLOR]):
+def process_color(img: Image.Image, func: Callable[[_COLOR], _COLOR]) -> Image.Image:
+    """
+    Applies a mapping function from one color to another,
+    on the given image.
+
+    Note here, that the mapping function will only be called once
+    per color. Additionally the 'magic ping' chroma key (#ff00ff)
+    cannot be remapped as it encodes 1-bit transparency.
+    """
     data = np.array(img)
     n_data = data.copy()
 
@@ -41,7 +61,8 @@ def _do_im_processing(b: bytes) -> bytes:
     support RLE compression for storage. Additionally
     make sure that we're BMP3 compliant.
 
-    !requires GIMP >v2.10.30 for file-bmp-save2 cmd
+    !requires GIMP >v2.10.30 but below v2.99 for
+    file-bmp-save2 cmd
 
     on the choice of GIMP:
         I've tried quite a few things to get the image
@@ -91,18 +112,29 @@ def _do_im_processing(b: bytes) -> bytes:
             return fp.read()
 
 def _img_to_bytes(img: Image.Image) -> bytes:
+    """
+    Convert image into a bytes object
+    """
     # store in bytes
     b = io.BytesIO()
-    img.info["dpi"] = (37.8, 37.8)
+    img.info["dpi"] = IMAGE_DPI
     img.save(b, filename="", format="bmp")
     return b.getvalue()
 
 def _img_to_bytes_palette(img: Image.Image) -> bytes:
+    """
+    Convert image into bytes using a palette
+    which is automatically generated.
+    """
     # set a palette again
     img = img.convert('P', palette=Image.Palette.ADAPTIVE)
     return _img_to_bytes(img)
 
 def _img_to_bytes_direct(img: Image.Image) -> bytes:
+    """
+    Convert image into bytes using the BMP direct
+    mode, without a peltte
+    """
     # set direct mode (remove palette if necessary)
     img = img.convert("RGB")
     return _img_to_bytes(img)
@@ -113,6 +145,9 @@ def save_optimized_file(img: Image.Image, output: str | Path, compress: bool = T
     Save a bmp file and choose the smallest possible version (palette
     vs. direct). This is important as the bitmaps need to fit into the
     storage space.
+
+    @param compress If True, compress image using the compression pipeline.
+                    This can take a lot longer.
     """
     # generate with and without palette to see which is smaller
     b_palette = _img_to_bytes_palette(img)
@@ -128,6 +163,20 @@ def save_optimized_file(img: Image.Image, output: str | Path, compress: bool = T
         fp.write(data)
 
 def file_process_color(in_file: str | Path, output: str | Path, func: Callable[[_COLOR], _COLOR], compress: bool = True, do_masking: bool = True, custom_mask: Optional[Image.Image] = None):
+    """
+    Process an image file with the specified masks, color remappings, …
+    and store it in the specified location.
+
+    Note here that the custom_mask is applied before the general
+    masks in _masks
+
+    @param in_file input file name
+    @param output output file name
+    @param func Color mapping function
+    @param compress If true, compresses image. This is not fast
+    @param do_masking If true uses the masks in _masks to preserve important UI elements
+    @param custom_mask if provided, will apply a custom user mask to the image
+    """
     img = Image.open(in_file).convert("RGB")
 
     img = process_color(img, func)

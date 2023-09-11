@@ -1,22 +1,27 @@
+"""
+My custom theme
+
+Does a simple hue rotate to change the accent color
+and has a few nice masks.
+"""
 import sys, pathlib
 
 from PIL import Image
 cur_folder = pathlib.Path(__file__).resolve().parent
 sys.path.append(str(cur_folder.parent))
 
-from argparse import ArgumentParser
 import tools.color_processing as cp
-from tools import get_original_files, hue_rotate, invert_color, rgb_to_hsv
+from tools import get_argparse, get_original_files, hue_rotate, rgb_to_hsv
 
-def get_args():
-    parser = ArgumentParser()
-    parser.add_argument("-f", "--fast", action="store_false", help="significantly faster processing by skiping compression step")
-    parser.add_argument("-i", "--input", help="specify to only process listed file")
-    return parser.parse_args()
-
-args = get_args()
+args = get_argparse().parse_args()
 
 def processing(color):
+    """
+    Rotate all colors with hue between 34.4-44.4°
+    and a saturation lower 60% by 236.9°
+
+    in other words: Map orange to lavendel
+    """
     h, s, _ = rgb_to_hsv(color)
     if abs(h - 39.4) > 5 or s > 60:
         return color
@@ -27,6 +32,7 @@ def process(in_f: pathlib.Path):
     out_f = cur_folder / in_f.name
 
     mask = None
+    # I've my own masks in ./_masks. So use these too
     if (f := (cur_folder / "_masks" / in_f.name)).is_file():
         mask = Image.open(f)
 
